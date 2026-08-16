@@ -12,9 +12,10 @@ import {
 type Props = {
   record: NetworkRecord;
   onPress: (id: string) => void;
+  onLongPress: (id: string) => void;
 };
 
-function RequestRowComponent({ record, onPress }: Props) {
+function RequestRowComponent({ record, onPress, onLongPress }: Props) {
   const { host, path } = splitUrl(record.url);
   const statusLabel =
     record.state === 'pending'
@@ -32,6 +33,8 @@ function RequestRowComponent({ record, onPress }: Props) {
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={() => onPress(record.id)}
+      onLongPress={() => onLongPress(record.id)}
+      delayLongPress={300}
     >
       <View style={styles.topLine}>
         <Text style={[styles.method, { color: methodColor(record.method) }]}>

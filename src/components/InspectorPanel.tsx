@@ -3,6 +3,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -28,10 +29,23 @@ const TOP_INSET = Platform.select({
 export function InspectorPanel({ visible, onClose }: Props) {
   const records = useNetworkRequests();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+
   const selected =
     selectedId != null
       ? records.find((record) => record.id === selectedId)
       : undefined;
+
+  async function handleExport() {
+    try {
+      await Share.share({
+        message: JSON.stringify(records, null, 2),
+        title: 'NetBubble Network Log',
+      });
+    } catch {
+      // user cancelled or share not available
+    }
+  }
 
   return (
     <Modal
@@ -59,6 +73,9 @@ export function InspectorPanel({ visible, onClose }: Props) {
                   <View style={styles.countPill}>
                     <Text style={styles.countText}>{records.length}</Text>
                   </View>
+                  <Pressable hitSlop={12} onPress={handleExport}>
+                    <Text style={styles.headerBtn}>Export</Text>
+                  </Pressable>
                   <Pressable
                     hitSlop={12}
                     onPress={() => {
@@ -79,7 +96,12 @@ export function InspectorPanel({ visible, onClose }: Props) {
           {selected ? (
             <RequestDetail record={selected} />
           ) : (
-            <RequestList records={records} onSelect={setSelectedId} />
+            <RequestList
+              records={records}
+              onSelect={setSelectedId}
+              query={query}
+              onQueryChange={setQuery}
+            />
           )}
         </View>
       </View>

@@ -87,11 +87,16 @@ export function NetBubble(props: NetBubbleProps) {
     return null;
   }
 
+  const hasError = records.some(
+    (r) => r.state === 'error' || (r.status != null && r.status >= 400)
+  );
+
   return (
     <>
       <FloatingBubble
         count={records.length}
         color={bubbleColor}
+        hasError={hasError}
         onPress={() => setOpen(true)}
       />
       <InspectorPanel visible={open} onClose={() => setOpen(false)} />

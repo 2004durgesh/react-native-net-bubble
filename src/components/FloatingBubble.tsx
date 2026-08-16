@@ -24,10 +24,11 @@ let savedPosition: Position | null = null;
 type Props = {
   count: number;
   color?: string;
+  hasError?: boolean;
   onPress: () => void;
 };
 
-export function FloatingBubble({ count, color, onPress }: Props) {
+export function FloatingBubble({ count, color, hasError, onPress }: Props) {
   const { width, height } = useWindowDimensions();
 
   const initial: Position = savedPosition ?? {
@@ -96,7 +97,11 @@ export function FloatingBubble({ count, color, onPress }: Props) {
       {...responder.panHandlers}
     >
       <View
-        style={[styles.inner, color ? { backgroundColor: color } : null]}
+        style={[
+          styles.inner,
+          color ? { backgroundColor: color } : null,
+          hasError ? { backgroundColor: colors.red } : null,
+        ]}
         pointerEvents="none"
       >
         <Text style={styles.glyph}>⇅</Text>
