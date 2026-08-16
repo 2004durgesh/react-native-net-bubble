@@ -49,14 +49,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-org/react-native-net-bubble.git"
+    "url": "git+https://github.com/2004durgesh/react-native-net-bubble.git"
   },
-  "author": "Your Name <you@example.com> (https://github.com/your-org)",
+  "author": "Durgesh Kumar Dwivedi <durgeshdwivedi81@gmail.com> (https://github.com/2004durgesh)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/your-org/react-native-net-bubble/issues"
+    "url": "https://github.com/2004durgesh/react-native-net-bubble/issues"
   },
-  "homepage": "https://github.com/your-org/react-native-net-bubble#readme",
+  "homepage": "https://github.com/2004durgesh/react-native-net-bubble#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
