@@ -1,6 +1,6 @@
 {
   "name": "react-native-net-bubble",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Self-contained in-app network inspector for React Native: a draggable floating bubble opens a live DevTools-style Network panel captured natively (OkHttp on Android, NSURLProtocol on iOS), with file-of-origin for each request. New Architecture / TurboModule only.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
