@@ -51,6 +51,13 @@ export interface Spec extends TurboModule {
   isRunning(): boolean;
   /** Cap the number of body bytes captured per request (default 1 MiB). */
   setMaxBodyBytes(bytes: number): void;
+  /**
+   * Read the composed Hermes+Metro source map baked in by the build scripts.
+   * Returns the raw JSON string, or an empty string if no map was bundled.
+   * Used by `configureAutoSymbolication` to enable release-build symbolication
+   * without a Metro server.
+   */
+  readBundledSourceMap(): Promise<string>;
 
   readonly onNetworkEvent: CodegenTypes.EventEmitter<NetworkEventPayload>;
 }

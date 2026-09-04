@@ -82,5 +82,8 @@ lib/
 ios/generated
 android/generated
 
+**/src/main/assets/netbubble-source-map.json
+
+
 # React Native Nitro Modules
 nitrogen/

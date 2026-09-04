@@ -1,0 +1,84 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// NetBubble: bake source map into Android assets for offline symbolication
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// React Native Gradle Plugin (RN 0.71+) already composes the Hermes bytecode
+// map with the Metro packager map and writes the result to:
+//
+//   build/generated/sourcemaps/react/{variant}/index.android.bundle.map
+//
+// This script adds a lightweight copy task that takes that pre-composed map
+// and drops it into `src/main/assets/netbubble-source-map.json` so the
+// native `readBundledSourceMap()` method can load it at runtime.
+//
+// HOW TO APPLY
+// ────────────
+// In your **app-level** `android/app/build.gradle`, add this line anywhere
+// after the `android {}` block:
+//
+//   apply from: "${rootDir}/../node_modules/react-native-net-bubble/scripts/netbubble-source-maps.gradle"
+//
+// PRODUCTION GATING
+// ─────────────────
+// • All `debug` build types are skipped (Metro handles symbolication live).
+// • Any product flavor named `production` or `prod` is skipped.
+// Adjust the `isProduction` predicate below for your own flavour naming.
+// ─────────────────────────────────────────────────────────────────────────────
+
+android.applicationVariants.all { variant ->
+  def buildType   = variant.buildType.name
+  def flavorName  = variant.flavorName   // "" when there are no product flavors
+  def variantName = variant.name         // e.g. "stagingRelease"
+
+  // ── Gate: skip debug and production ──────────────────────────────────────
+  def isProduction = variant.productFlavors.any { f ->
+    f.name == 'production' || f.name == 'prod'
+  }
+  if (buildType == 'debug' || isProduction) return
+
+  def capitalizedVariant = variantName.capitalize()
+
+  // ── RNGP bundle task name (React Native 0.71+) ───────────────────────────
+  //   createBundle{Variant}JsAndAssets
+  def bundleTaskName = "createBundle${capitalizedVariant}JsAndAssets"
+
+  // ── Paths ─────────────────────────────────────────────────────────────────
+  // RNGP writes the already-composed (Hermes + Metro) source map here.
+  // No need to run compose-source-maps.js ourselves.
+  def smSubpath   = flavorName ? "${flavorName}/${buildType}" : buildType
+  def composedMap = new File("${project.buildDir}/generated/sourcemaps/react/${smSubpath}/index.android.bundle.map")
+
+  // Destination: standard Android assets directory, read at runtime via
+  // context.assets.open("netbubble-source-map.json")
+  def outputDir  = new File("${project.projectDir}/src/main/assets")
+  def outputFile = new File(outputDir, 'netbubble-source-map.json')
+
+  // ── Register the copy task ────────────────────────────────────────────────
+  def copyTask = project.tasks.register("netBubbleCopySourceMap${capitalizedVariant}") {
+    group       = 'NetBubble'
+    description = "Copy composed source map → assets for NetBubble symbolication (${variantName})"
+
+    doLast {
+      if (!composedMap.exists()) {
+        logger.warn(
+          "[NetBubble] Source map not found at:\n" +
+          "  ${composedMap}\n" +
+          "  Verify that source maps are enabled (hermesFlags includes " +
+          "'-output-source-map') and the ${bundleTaskName} task ran."
+        )
+        return
+      }
+      outputDir.mkdirs()
+      composedMap.withInputStream { s -> outputFile.bytes = s.bytes }
+      def sizeKb = (outputFile.length() / 1024).toInteger()
+      logger.lifecycle("[NetBubble] Source map (${sizeKb} KB) → ${outputFile}")
+    }
+  }
+
+  // ── Wire the copy task to run after the bundle task ───────────────────────
+  // tasks.matching().configureEach is reliable with RNGP's lazy task
+  // registration; whenTaskAdded fires too early on modern Gradle.
+  project.tasks.matching { it.name == bundleTaskName }.configureEach { bundleTask ->
+    bundleTask.finalizedBy copyTask
+  }
+}

@@ -161,6 +161,23 @@ class NetworkStore {
     this.scheduleFlush();
   };
 
+  /**
+   * Re-run async symbolication for every record that has a captured stack.
+   * Call this after a new source-map resolver is registered (e.g. after
+   * `configureAutoSymbolication` finishes loading the bundled map) so records
+   * that were captured before the resolver was ready get correct file:line
+   * origins instead of the raw `index.android.bundle` fallback.
+   */
+  resymbolicateAll(): void {
+    for (const [id, record] of this.records) {
+      if (record.stack) {
+        // Remove from the "in-progress" guard so upgradeOrigin will retry.
+        this.symbolicating.delete(id);
+        this.upgradeOrigin(id, record.stack);
+      }
+    }
+  }
+
   /** Asynchronously upgrade a record's origin via full symbolication. */
   private upgradeOrigin(id: string, stack: string): void {
     if (this.symbolicating.has(id)) {

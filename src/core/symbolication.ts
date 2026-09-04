@@ -25,11 +25,17 @@ let resolver: SourceMapResolver | undefined;
  * source map bundled into your non-prod builds so you get exact
  * `ProfileScreen.tsx:84` origins even without Metro. See the README for a
  * `source-map-js` recipe.
+ *
+ * Clears the in-memory symbolication cache so any previously cached
+ * (unsymbolicated) frames are re-resolved on next access.
  */
 export function configureSymbolication(options: {
   resolveFrame?: SourceMapResolver;
 }): void {
   resolver = options.resolveFrame;
+  // Invalidate cached results that were resolved without this resolver so
+  // any records that landed before the source map was ready get re-processed.
+  cache.clear();
 }
 
 const INTERNAL_MARKERS = [

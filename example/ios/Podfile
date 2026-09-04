@@ -30,5 +30,34 @@ target 'NetBubbleExample' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # ── NetBubble: auto-insert compose source maps build phase ───────────────
+    # Adds a "NetBubble: compose source maps" run-script phase that fires after
+    # "Bundle React Native code and images" to fuse the Hermes bytecode map
+    # with the Metro packager map.  This enables offline symbolication (real
+    # file:line origins in the Initiator tab) without a Metro server.
+    #
+    # The phase only runs for non-Release configurations (see the shell script).
+    # Re-run `pod install` after adding or removing this block.
+    app_project = Xcodeproj::Project.open('NetBubbleExample.xcodeproj')
+    app_project.targets.each do |target|
+      next unless target.name == 'NetBubbleExample'
+      next if target.shell_script_build_phases.any? { |p| p.name == 'NetBubble: compose source maps' }
+
+      phase = target.new_shell_script_build_phase('NetBubble: compose source maps')
+      phase.shell_script = '"${SRCROOT}/../../scripts/netbubble-source-maps.sh"'
+
+      # Move the new phase to immediately after "Bundle React Native code and images"
+      bundle_idx = target.build_phases.index { |p|
+        p.respond_to?(:name) && p.name.to_s.include?('Bundle React Native')
+      }
+      if bundle_idx
+        phase_ref = target.build_phases.pop
+        target.build_phases.insert(bundle_idx + 1, phase_ref)
+      end
+
+      puts "[NetBubble] Added 'compose source maps' build phase to #{target.name}"
+    end
+    app_project.save
   end
 end

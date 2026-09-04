@@ -367,6 +367,100 @@ configureSymbolication({
 
 Because production is gated out entirely, the source map only ships in builds that already exclude real users.
 
+### Automatic release-build symbolication (zero Metro required)
+
+For QA and staging builds shipped to testers — where Metro is not running — the library can symbolicate entirely offline from a source map baked into the binary itself.
+
+#### Why two maps?
+
+Hermes-enabled React Native builds go through two compilation stages, each producing its own source map:
+
+```
+Metro bundler
+    ↓  main.jsbundle            (JS → bundle)
+    ↓  packager.js.map          (bundle pos → original file:line)
+
+Hermes compiler
+    ↓  main.jsbundle (HBC)      (bundle → Hermes bytecode)
+    ↓  compiler.js.map          (bytecode pos → bundle pos)
+```
+
+A raw Hermes stack frame contains **bytecode** positions. To resolve those to your `ProfileScreen.tsx:84`, both maps must be composed in sequence:
+
+```
+bytecode pos → (compiler.js.map) → bundle pos → (packager.js.map) → file:line
+```
+
+React Native ships `scripts/compose-source-maps.js` for exactly this. The build scripts in `scripts/` wire that step into your build automatically.
+
+#### How it fits together
+
+```mermaid
+flowchart LR
+    subgraph Build time
+        M[Metro bundler] -->|packager.js.map| C
+        H[Hermes compiler] -->|compiler.js.map| C
+        C[compose-source-maps.js] -->|netbubble-source-map.json| B[App binary]
+    end
+
+    subgraph Run time
+        B -->|readBundledSourceMap| AS[configureAutoSymbolication]
+        AS -->|SourceMapConsumer| SR[symbolicate]
+        SR --> UI[Initiator tab\nProfileScreen.tsx:84]
+    end
+
+    style C fill:#a371f7,color:#fff
+    style AS fill:#4c8dff,color:#fff
+    style UI fill:#3fb950,color:#000
+```
+
+#### Setup
+
+**Step 1 — install `source-map-js` in your app**
+
+```sh
+yarn add source-map-js
+```
+
+**Step 2 — Android: apply the Gradle snippet**
+
+In your app-level `android/app/build.gradle`, add after the `android {}` block:
+
+```gradle
+apply from: "${rootDir}/../node_modules/react-native-net-bubble/scripts/netbubble-source-maps.gradle"
+```
+
+This adds a `netBubbleComposeMaps{Variant}` task that runs automatically after `createBundle{Variant}JsAndAssets` for every non-debug, non-production variant. The composed map lands in `android/app/src/main/assets/netbubble-source-map.json`.
+
+**Step 3 — iOS: add an Xcode build phase**
+
+1. Open your project in Xcode → select the app target → **Build Phases**.
+2. Click **+** → **New Run Script Phase**.
+3. Drag it immediately **after** "Bundle React Native code and images".
+4. Paste as the script body:
+   ```sh
+   "${SRCROOT}/../node_modules/react-native-net-bubble/scripts/netbubble-source-maps.sh"
+   ```
+5. Optionally rename the phase to "NetBubble: compose source maps".
+
+> **Source maps must be enabled** in your Xcode scheme for non-debug builds. In your scheme's **Build → Pre-actions**, add:
+> ```sh
+> export SOURCEMAP_FILE="${DERIVED_FILE_DIR}/main.jsbundle.packager.js.map"
+> ```
+
+**Step 4 — call `configureAutoSymbolication` once at startup**
+
+In your app entry point (outside any component, before `<NetBubble>` mounts):
+
+```ts
+import { configureAutoSymbolication } from 'react-native-net-bubble';
+
+// fire-and-forget — async internally, but safe to call synchronously
+configureAutoSymbolication();
+```
+
+In `__DEV__` this is a no-op — Metro's live `/symbolicate` path takes over automatically. In a non-dev build with the Gradle/Xcode scripts applied, it reads the bundled map and resolves every captured request to the exact file and line that triggered it.
+
 ---
 
 ## Export session

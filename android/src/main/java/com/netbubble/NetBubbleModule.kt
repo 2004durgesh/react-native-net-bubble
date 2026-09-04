@@ -1,5 +1,6 @@
 package com.netbubble
 
+import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.WritableMap
 
@@ -22,6 +23,21 @@ class NetBubbleModule(reactContext: ReactApplicationContext) :
 
   override fun setMaxBodyBytes(bytes: Double) {
     NetBubbleInterceptor.maxBodyBytes = bytes.toLong()
+  }
+
+  /**
+   * Read the composed Hermes+Metro source map that the netbubble-source-maps
+   * Gradle script bakes into `src/main/assets/netbubble-source-map.json`.
+   * Returns an empty string when the file is absent (debug builds / prod).
+   */
+  override fun readBundledSourceMap(promise: Promise) {
+    try {
+      val stream = reactApplicationContext.assets.open("netbubble-source-map.json")
+      val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+      promise.resolve(text)
+    } catch (_: Throwable) {
+      promise.resolve("")
+    }
   }
 
   override fun invalidate() {
