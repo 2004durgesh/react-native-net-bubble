@@ -367,7 +367,7 @@ A raw Hermes stack frame contains **bytecode** positions. To resolve those to yo
 bytecode pos → (compiler.js.map) → bundle pos → (packager.js.map) → file:line
 ```
 
-React Native ships `scripts/compose-source-maps.js` for exactly this. The build scripts in `scripts/` wire that step into your build automatically.
+React Native ships `scripts/compose-source-maps.js` for exactly this, and its own build steps run it whenever source maps are enabled. The build scripts in `scripts/` copy the composed result into your app.
 
 #### How it fits together
 
@@ -400,23 +400,23 @@ In your app-level `android/app/build.gradle`, add after the `android {}` block:
 apply from: "${rootDir}/../node_modules/react-native-net-bubble/scripts/netbubble-source-maps.gradle"
 ```
 
-This adds a `netBubbleComposeMaps{Variant}` task that runs automatically after `createBundle{Variant}JsAndAssets` for every non-debug, non-production variant. The composed map lands in `android/app/src/main/assets/netbubble-source-map.json`.
+This adds a `netBubbleCopySourceMap{Variant}` task that runs automatically after `createBundle{Variant}JsAndAssets` for every non-debug, non-production variant. The composed map lands in `android/app/src/main/assets/netbubble-source-map.json`.
 
-**Step 2 — iOS: add an Xcode build phase**
+**Step 2 — iOS: enable source maps and add an Xcode build phase**
 
-1. Open your project in Xcode → select the app target → **Build Phases**.
-2. Click **+** → **New Run Script Phase**.
-3. Drag it immediately **after** "Bundle React Native code and images".
-4. Paste as the script body:
+1. In Xcode, select the app target → **Build Settings** → **+** → **Add User-Defined Setting**, for each configuration that should get a map:
+   ```
+   SOURCEMAP_FILE = $(DERIVED_FILE_DIR)/main.jsbundle.map
+   ```
+   It must be a build setting, not `.xcode.env` or a scheme pre-action, so both React Native's bundle phase and the NetBubble phase can see it.
+2. Go to **Build Phases** → **+** → **New Run Script Phase**, and drag it immediately **after** "Bundle React Native code and images".
+3. Paste as the script body:
    ```sh
    "${SRCROOT}/../node_modules/react-native-net-bubble/scripts/netbubble-source-maps.sh"
    ```
-5. Optionally rename the phase to "NetBubble: compose source maps".
+4. Optionally rename the phase to "NetBubble: source map".
 
-> **Source maps must be enabled** in your Xcode scheme for non-debug builds. In your scheme's **Build → Pre-actions**, add:
-> ```sh
-> export SOURCEMAP_FILE="${DERIVED_FILE_DIR}/main.jsbundle.packager.js.map"
-> ```
+> Configurations named exactly `Release` are skipped, on the assumption that Release is your App Store build. To include the map in Release anyway (for example, QA builds made from the Release configuration), also add `NETBUBBLE_SOURCE_MAPS_IN_RELEASE = YES` for Release.
 
 **Step 3 — call `configureAutoSymbolication` once at startup**
 
