@@ -5,7 +5,6 @@
 @implementation NetBubble
 
 - (void)start {
-  [NetBubbleURLProtocol install];
   [NetBubbleURLProtocol setEnabled:YES];
 
   __weak NetBubble *weakSelf = self;

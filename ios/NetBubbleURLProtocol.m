@@ -66,6 +66,11 @@ static NSString *NetBubbleJSONString(NSDictionary *dict) {
 
 @implementation NetBubbleURLProtocol
 
+// RN caches its NSURLSession on the first request, so the swizzle must exist before then.
++ (void)load {
+  [self install];
+}
+
 + (void)install {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{

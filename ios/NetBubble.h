@@ -1,5 +1,5 @@
 #import <NetBubbleSpec/NetBubbleSpec.h>
 
-@interface NetBubble : NSObject <NativeNetBubbleSpec>
+@interface NetBubble : NativeNetBubbleSpecBase <NativeNetBubbleSpec>
 
 @end
