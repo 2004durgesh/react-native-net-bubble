@@ -10,9 +10,10 @@ export type StackFrame = {
 };
 
 /**
- * Turn a single app stack frame into a {@link RequestOrigin}. May be async so it
- * can consult a bundled source map (e.g. via `source-map-js`). Returning
- * `undefined` falls back to the built-in resolution.
+ * Turn a single stack frame into a {@link RequestOrigin}. May be async so it
+ * can consult a bundled source map. Called for each frame, top-down, until one
+ * resolves to app code (not `node_modules` or this library). Returning
+ * `undefined` for every frame falls back to the built-in resolution.
  */
 export type SourceMapResolver = (
   frame: StackFrame
@@ -23,8 +24,8 @@ let resolver: SourceMapResolver | undefined;
 /**
  * Provide your own frame → source resolver. Use this to symbolicate against a
  * source map bundled into your non-prod builds so you get exact
- * `ProfileScreen.tsx:84` origins even without Metro. See the README for a
- * `source-map-js` recipe.
+ * `ProfileScreen.tsx:84` origins even without Metro. Most apps should use
+ * `configureAutoSymbolication` instead.
  *
  * Clears the in-memory symbolication cache so any previously cached
  * (unsymbolicated) frames are re-resolved on next access.
@@ -60,9 +61,13 @@ function isDev(): boolean {
   return typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 }
 
-function isInternalFrame(frame: StackFrame): boolean {
-  const haystack = `${frame.methodName} ${frame.file}`;
+function isInternal(methodName: string | undefined, file: string): boolean {
+  const haystack = `${methodName ?? ''} ${file}`;
   return INTERNAL_MARKERS.some((marker) => haystack.includes(marker));
+}
+
+function isInternalFrame(frame: StackFrame): boolean {
+  return isInternal(frame.methodName, frame.file);
 }
 
 export function parseStack(stack: string): StackFrame[] {
@@ -216,6 +221,29 @@ async function metroSymbolicate(
   }
 }
 
+// Hermes release frames are just `bundle:1:<offset>`, so app vs. library code is only knowable after resolving.
+async function resolveFirstAppFrame(
+  frames: StackFrame[],
+  resolve: SourceMapResolver
+): Promise<RequestOrigin | undefined> {
+  for (const frame of frames) {
+    // InternalBytecode offsets point into Hermes' own bytecode, not the app bundle.
+    if (frame.line == null || frame.file.includes('InternalBytecode')) {
+      continue;
+    }
+    let origin: RequestOrigin | undefined;
+    try {
+      origin = await resolve(frame);
+    } catch {
+      continue;
+    }
+    if (origin && !isInternal(origin.methodName, origin.file)) {
+      return origin;
+    }
+  }
+  return undefined;
+}
+
 const cache = new Map<string, RequestOrigin | undefined>();
 
 /**
@@ -235,15 +263,11 @@ export async function symbolicate(
     return cache.get(stack);
   }
 
-  const appFrame = pickAppFrame(parseStack(stack));
+  const frames = parseStack(stack);
   let origin: RequestOrigin | undefined;
 
-  if (resolver && appFrame) {
-    try {
-      origin = await resolver(appFrame);
-    } catch {
-      // fall through
-    }
+  if (resolver) {
+    origin = await resolveFirstAppFrame(frames, resolver);
   }
 
   if (!origin && isDev()) {
@@ -254,8 +278,11 @@ export async function symbolicate(
     }
   }
 
-  if (!origin && appFrame) {
-    origin = frameToOrigin(appFrame);
+  if (!origin) {
+    const appFrame = pickAppFrame(frames);
+    if (appFrame) {
+      origin = frameToOrigin(appFrame);
+    }
   }
 
   cache.set(stack, origin);
